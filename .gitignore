@@ -1,6 +1,11 @@
+__pycache__/
+book_list.json
 catalog_metadata.json
+contents/
+epubs/
 pg_catalog.csv
 rdf_metadata.json
 rdf-files.tar
 rdf-files.tar.zip
 rdf-files/
+subject_list.json

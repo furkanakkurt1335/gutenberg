@@ -1,7 +1,6 @@
 import argparse, csv, json, re, requests, tarfile, zipfile
 from pathlib import Path
 import xml.etree.ElementTree as ET
-import time
 
 def get_args():
     parser = argparse.ArgumentParser(description='Download metadata and epubs from Project Gutenberg')
@@ -82,7 +81,15 @@ def download_rdf_files(rdf_files_path):
             file.extractall(rdf_files_dir)
         print('Untarred rdf-files.tar.')
 
-def prepare_rdf_metadata(script_dir, catalog_metadata, rdf_metadata_path):
+def prepare_rdf_metadata(rdf_metadata_path, language='en'):
+    script_dir = rdf_metadata_path.parent
+    catalog_metadata_path = script_dir / 'catalog_metadata.json'
+    if not catalog_metadata_path.exists():
+        catalog_metadata = prepare_catalog_metadata(script_dir, catalog_metadata_path, language)
+    else:
+        with catalog_metadata_path.open() as file:
+            catalog_metadata = json.load(file)
+
     book_ids = sorted(list(catalog_metadata.keys()), key=lambda x: int(x))
     print(f'Found {len(book_ids)} books')
 
@@ -200,24 +207,18 @@ def prepare_rdf_metadata(script_dir, catalog_metadata, rdf_metadata_path):
             'epub_noimages_link': epub_noimages_link,
             'txt_link': txt_link
         }
-    
+
     with rdf_metadata_path.open('w') as file:
         json.dump(rdf_metadata, file, indent=4, ensure_ascii=False)
+    
+    return rdf_metadata
 
 def main():
     args = get_args()
     script_dir = Path(__file__).parent
-
-    catalog_metadata_path = script_dir / 'catalog_metadata.json'
-    if not catalog_metadata_path.exists():
-        prepare_catalog_metadata(script_dir, catalog_metadata_path, args.language)
-
-    with catalog_metadata_path.open() as file:
-        catalog_metadata = json.load(file)
-
     rdf_metadata_path = script_dir / 'rdf_metadata.json'
     if not rdf_metadata_path.exists():
-        prepare_rdf_metadata(script_dir, catalog_metadata, rdf_metadata_path)
+        prepare_rdf_metadata(rdf_metadata_path, args.language)
 
 if __name__ == '__main__':
     main()
