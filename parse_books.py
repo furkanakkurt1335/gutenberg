@@ -13,6 +13,7 @@ def download_epub(epub_noimages_link, epub_path):
     response = requests.get(epub_noimages_link)
     with epub_path.open('wb') as file:
         file.write(response.content)
+    print(f'Downloaded {epub_path}')
 
 def main():
     args = get_args()
@@ -23,6 +24,7 @@ def main():
     else:
         with rdf_metadata_path.open() as file:
             rdf_metadata = json.load(file)
+    print('Loaded rdf_metadata.json')
 
     if args.book_list:
         book_list_path = args.book_list
@@ -34,7 +36,7 @@ def main():
 
     epubs_dir = script_dir / 'epubs'
     epubs_dir.mkdir(exist_ok=True)
-    for book_id in book_ids[:5]:
+    for book_id in book_ids:
         epub_path = epubs_dir / f'{book_id}.epub'
         if epub_path.exists():
             continue
@@ -44,33 +46,61 @@ def main():
             continue
         epub_noimages_link = metadata['epub_noimages_link']
         download_epub(epub_noimages_link, epub_path)
-    
+
+    hs = ['h2', 'h3', 'h4', 'h5', 'h6']
     epub_list = sorted(list(epubs_dir.iterdir()), key=lambda x: int(x.stem))
     for epub_path in epub_list:
         book = epub.read_epub(str(epub_path))
-        start, end = False, False
+        started, ended = False, False
         chapters = []
         for item in book.get_items():
             content, media_type = item.get_content(), item.get_type()
             if media_type != ebooklib.ITEM_DOCUMENT:
                 continue
             soup = BeautifulSoup(content, 'html.parser')
-            if not start:
+            if not started:
                 start = soup.find('div', id='pg-start-separator')
                 if start:
-                    start = True
-                    continue
-            if start and not end:
+                    started = True
+                    previous_sibling = start.find_previous_sibling()
+                    while previous_sibling:
+                        previous_sibling.decompose()
+                        previous_sibling = start.find_previous_sibling()
+            if started and not ended:
                 end = soup.find('div', id='pg-end-separator')
                 if end:
                     break
-            if start:
-                chapter = soup.find('div', class_='chapter')
-                h2 = chapter.find('h2')
-                title = h2.text.strip()
-                h2.decompose()
-                chapter_text = chapter.text.strip()
-                chapters.append({'title': title, 'text': chapter_text})
+            if started:
+                chapter_l = soup.find_all('div', class_='chapter')
+                if chapter_l:
+                    for chapter in chapter_l:
+                        for h in hs:
+                            headers = chapter.find_all(h)
+                            if headers:
+                                for header in headers:
+                                    title = header.text.strip()
+                                    chapter_text, next_sibling = '', header.find_next_sibling()
+                                    while next_sibling and next_sibling.name != h:
+                                        chapter_text += next_sibling.text.strip()
+                                        next_sibling = next_sibling.find_next_sibling()
+                                    if not chapter_text:
+                                        continue
+                                    chapters.append({'title': title, 'text': chapter_text})
+                                break
+                else:
+                    for h in hs:
+                        headers = soup.find_all(h)
+                        if headers:
+                            for header in headers:
+                                title = header.text.strip()
+                                chapter_text, next_sibling = '', header.find_next_sibling()
+                                while next_sibling and next_sibling.name != h:
+                                    chapter_text += next_sibling.text.strip()
+                                    next_sibling = next_sibling.find_next_sibling()
+                                if not chapter_text:
+                                    continue
+                                chapters.append({'title': title, 'text': chapter_text})
+                            break
         print(f'Found {len(chapters)} chapters in {epub_path}')
 
         ebook_id = epub_path.stem
