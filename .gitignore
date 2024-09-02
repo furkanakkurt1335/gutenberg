@@ -1,2 +1,6 @@
+catalog_metadata.json
 pg_catalog.csv
-metadata.json
+rdf_metadata.json
+rdf-files.tar
+rdf-files.tar.zip
+rdf-files/
