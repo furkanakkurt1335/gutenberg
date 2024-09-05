@@ -10,7 +10,7 @@ def get_args():
     parser.add_argument('-f', '--format', type=str, default='epub', help='Format of books')
     return parser.parse_args()
 
-def download(link, path):
+def download_book(link, path):
     response = requests.get(link)
     with path.open('wb') as file:
         file.write(response.content)
@@ -76,26 +76,8 @@ def parse_book(book_format, book_path):
             content = content[:end]
         return content
 
-def main():
-    args = get_args()
-    book_format = args.format
+def download_books(book_format, book_ids, rdf_metadata):
     script_dir = Path(__file__).parent
-    rdf_metadata_path = script_dir / 'rdf_metadata.json'
-    if not rdf_metadata_path.exists():
-        rdf_metadata = prepare_rdf_metadata(rdf_metadata_path)
-    else:
-        with rdf_metadata_path.open() as file:
-            rdf_metadata = json.load(file)
-    print('Loaded rdf_metadata.json')
-
-    if args.book_list:
-        book_list_path = args.book_list
-        with book_list_path.open() as file:
-            book_list = json.load(file)
-            book_ids = [book['id'] for book in book_list]
-    else:
-        book_ids = rdf_metadata.keys()
-
     book_dir = script_dir / f'{book_format}s'
     book_dir.mkdir(exist_ok=True)
     books_downloaded = []
@@ -122,7 +104,7 @@ def main():
             print(f'No {metadata_key} for {book_id}')
             continue
         link = metadata[metadata_key]
-        download(link, book_path)
+        download_book(link, book_path)
         for author in authors:
             author_id = author['id']
             books_downloaded.append((author_id, title))
@@ -130,6 +112,9 @@ def main():
             for alias in aliases:
                 books_downloaded.append((alias, title))
 
+def parse_books(book_format):
+    script_dir = Path(__file__).parent
+    book_dir = script_dir / f'{book_format}s'
     book_list = sorted(list(book_dir.iterdir()), key=lambda x: int(x.stem))
     for book_path in book_list:
         content = parse_book(book_format, book_path)
@@ -144,6 +129,30 @@ def main():
             content_path = content_path / f'{book_id}.json'
             with content_path.open('w') as file:
                 json.dump(content, file, indent=4, ensure_ascii=False)
+
+def main():
+    args = get_args()
+    book_format = args.format
+    script_dir = Path(__file__).parent
+    rdf_metadata_path = script_dir / 'rdf_metadata.json'
+    if not rdf_metadata_path.exists():
+        rdf_metadata = prepare_rdf_metadata(rdf_metadata_path)
+    else:
+        with rdf_metadata_path.open() as file:
+            rdf_metadata = json.load(file)
+    print('Loaded rdf_metadata.json')
+
+    if args.book_list:
+        book_list_path = args.book_list
+        with book_list_path.open() as file:
+            book_list = json.load(file)
+            book_ids = [book['id'] for book in book_list]
+    else:
+        book_ids = rdf_metadata.keys()
+
+    download_books(book_format, book_ids, rdf_metadata)
+
+    parse_books(book_format)
 
 if __name__ == '__main__':
     main()
