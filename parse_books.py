@@ -74,7 +74,7 @@ def parse_book(book_format, book_path):
         if end:
             end = end.start()
             content = content[:end]
-        return content
+        return content.strip()
 
 def download_books(book_format, book_ids, rdf_metadata):
     script_dir = Path(__file__).parent
